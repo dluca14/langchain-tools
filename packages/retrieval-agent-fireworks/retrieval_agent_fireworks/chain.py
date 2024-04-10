@@ -1,6 +1,7 @@
 from typing import List
 
 from langchain import hub
+from langchain.agents import tool
 from langchain.agents import AgentExecutor
 from langchain.agents.format_scratchpad import format_log_to_str
 from langchain.agents.output_parsers import ReActJsonSingleInputOutputParser
@@ -16,7 +17,6 @@ from langchain_community.vectorstores import Chroma
 from langchain_nomic import NomicEmbeddings
 
 MODEL_ID = "accounts/fireworks/models/mixtral-8x7b-instruct"
-
 
 # class ArxivRetriever(BaseRetriever, ArxivAPIWrapper):
 #     """`Arxiv` retriever.
@@ -73,12 +73,32 @@ embeddings = NomicEmbeddings(model="nomic-embed-text-v1.5")
 vectorstore = Chroma(embedding_function=embeddings, persist_directory='./chroma_db')
 vectorstore_retriever = vectorstore.as_retriever()
 vectorstore_tool_description = (
-    'A tool that looks up documentation about the LangChain Expression Language.'
+    # 'A tool that looks up documentation about the LangChain Expression Language.'
+    'A tool that looks up into HuggingFace documentation about the parameters that would help with the pictures configuration.'
 )
 vectorstore_tool = create_retriever_tool(vectorstore_retriever, name="docstore",
                                          description=vectorstore_tool_description)
 
-tools = [vectorstore_tool]
+''' Custom Tools '''
+@tool
+def increase_brightness() -> int:
+    """Increases the value of variable "brightness" which is by default 0 with an increment of 7 based on user input and returns the value of "brightness"."""
+    # """Increase of decrease brightness of the photo based on user input and returns its value"""
+    brightness = 0
+    brightness += 7
+    return brightness
+
+
+@tool
+def decrease_brightness() -> int:
+    """Decreases the value of variable "brightness" which is by default 0 with an increment of 7 based on user input and returns the value of "brightness"."""
+    # """Increase of decrease brightness of the photo based on user input and returns its value"""
+    brightness = 0
+    brightness -= 7
+    return brightness
+
+
+tools = [vectorstore_tool, increase_brightness, decrease_brightness]
 
 # Set up LLM
 llm = ChatFireworks(
@@ -100,14 +120,18 @@ prompt = prompt.partial(
 
 # define the agent
 model_with_stop = llm.bind(stop=["\nObservation"])
+init_prompt = ("This is an agent that can increase or decrease the brightness of a photo. You can also use it to look "
+               "up into HuggingFace documentation about the parameters that would help with the pictures "
+               "configuration. To use the agent, you can input 'increase brightness', 'decrease brightness', "
+               "or a query for the documentation.")
 agent = (
-    {
-        "input": lambda x: x["input"],
-        "agent_scratchpad": lambda x: format_log_to_str(x["intermediate_steps"]),
-    }
-    | prompt
-    | model_with_stop
-    | ReActJsonSingleInputOutputParser()
+        {
+            "input": lambda x: x["input"] if x['input'] else init_prompt,
+            "agent_scratchpad": lambda x: format_log_to_str(x["intermediate_steps"]),
+        }
+        | prompt
+        | model_with_stop
+        | ReActJsonSingleInputOutputParser()
 )
 
 
