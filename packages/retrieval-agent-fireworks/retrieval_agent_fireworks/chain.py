@@ -8,7 +8,9 @@ from langchain.agents.output_parsers import ReActJsonSingleInputOutputParser
 from langchain.callbacks.manager import CallbackManagerForRetrieverRun
 from langchain.tools.render import render_text_description
 from langchain.tools.retriever import create_retriever_tool
-from langchain_community.chat_models.fireworks import ChatFireworks
+from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings
+# from langchain_community.chat_models.fireworks import ChatFireworks
+from langchain_fireworks import ChatFireworks
 from langchain_community.utilities.arxiv import ArxivAPIWrapper
 from langchain_core.documents import Document
 from langchain_core.pydantic_v1 import BaseModel
@@ -69,7 +71,9 @@ MODEL_ID = "accounts/fireworks/models/mixtral-8x7b-instruct"
 
 
 ''' LCEL documentation tool '''
-embeddings = NomicEmbeddings(model="nomic-embed-text-v1.5")
+# embeddings = NomicEmbeddings(model="nomic-embed-text-v1.5")
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2",
+                                   model_kwargs={'device': 'cuda'})
 vectorstore = Chroma(embedding_function=embeddings, persist_directory='./chroma_db')
 vectorstore_retriever = vectorstore.as_retriever()
 vectorstore_tool_description = (
@@ -79,35 +83,39 @@ vectorstore_tool_description = (
 vectorstore_tool = create_retriever_tool(vectorstore_retriever, name="docstore",
                                          description=vectorstore_tool_description)
 
-''' Custom Tools '''
-@tool
-def increase_brightness() -> int:
-    """Increases the value of variable "brightness" which is by default 0 with an increment of 7 based on user input and returns the value of "brightness"."""
-    # """Increase of decrease brightness of the photo based on user input and returns its value"""
-    brightness = 0
-    brightness += 7
-    return brightness
-
 
 @tool
-def decrease_brightness() -> int:
-    """Decreases the value of variable "brightness" which is by default 0 with an increment of 7 based on user input and returns the value of "brightness"."""
-    # """Increase of decrease brightness of the photo based on user input and returns its value"""
-    brightness = 0
-    brightness -= 7
-    return brightness
+def increase_brightness(brightness: int, increment: int = 5) -> int:
+    """
+        Useful when you want to increase the value of variable brightness.
+        :param brightness: Current value of the variable which is 0.
+        :param increment: Increment value (default=5).
+        :return: Updated value after increment.
+        """
+    print(type(brightness), type(increment))
+    return int(brightness) + increment
 
 
-tools = [vectorstore_tool, increase_brightness, decrease_brightness]
+@tool
+def decrease_brightness(brightness: int, increment: int = -5) -> int:
+    """
+        Useful when you want to decrease the value of variable brightness.
+        :param brightness: Current value of the variable which is 0.
+        :param increment: Increment value (default=-5).
+        :return: Updated value after increment.
+        """
+    print(type(brightness), type(increment))
+    return int(brightness) + increment
+
+
+# tools = [vectorstore_tool, increase_brightness, decrease_brightness]
+tools = [increase_brightness, decrease_brightness]
 
 # Set up LLM
 llm = ChatFireworks(
-    model=MODEL_ID,
-    model_kwargs={
-        "temperature": 0,
-        "max_tokens": 2048,
-        "top_p": 1,
-    },
+    model_name=MODEL_ID,
+    max_tokens=2048,
+    temperature=0,
     cache=True,
 )
 
@@ -120,10 +128,13 @@ prompt = prompt.partial(
 
 # define the agent
 model_with_stop = llm.bind(stop=["\nObservation"])
-init_prompt = ("This is an agent that can increase or decrease the brightness of a photo. You can also use it to look "
-               "up into HuggingFace documentation about the parameters that would help with the pictures "
-               "configuration. To use the agent, you can input 'increase brightness', 'decrease brightness', "
-               "or a query for the documentation.")
+init_prompt = ("You are an assistant that is helping with picture editing. "
+               "You are able to increase or decrease the brightness of a photo."
+               " You can also use it to look up into HuggingFace documentation about the parameters that would "
+               "help with the pictures configuration. To use the agent, you can input 'increase brightness', "
+               "'decrease brightness', or a query for the documentation."
+               "If you don't know the answer, just say that you don't know. \
+                Use three sentences maximum and keep the answer concise")
 agent = (
         {
             "input": lambda x: x["input"] if x['input'] else init_prompt,
