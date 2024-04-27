@@ -10,10 +10,6 @@ from langchain_core.prompts import MessagesPlaceholder, ChatPromptTemplate
 from langchain_core.messages import AIMessage, HumanMessage
 
 
-llm = ChatOpenAI(model="gpt-3.5-turbo",
-                 temperature=0,)
-
-
 @tool
 def get_word_length(word: str) -> int:
     """Returns the length of a word."""
@@ -21,6 +17,8 @@ def get_word_length(word: str) -> int:
 
 
 tools = [get_word_length]
+
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0,)
 
 # with memory
 llm_with_tools = llm.bind_tools(tools)
