@@ -72,8 +72,8 @@ MODEL_ID = "accounts/fireworks/models/mixtral-8x7b-instruct"
 
 ''' LCEL documentation tool '''
 # embeddings = NomicEmbeddings(model="nomic-embed-text-v1.5")
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2",
-                                   model_kwargs={'device': 'cuda'})
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+#                                    model_kwargs={'device': 'cuda'})
 vectorstore = Chroma(embedding_function=embeddings, persist_directory='./chroma_db')
 vectorstore_retriever = vectorstore.as_retriever()
 vectorstore_tool_description = (
@@ -108,8 +108,8 @@ def decrease_brightness(brightness: int, increment: int = -5) -> int:
     return int(brightness) + increment
 
 
-# tools = [vectorstore_tool, increase_brightness, decrease_brightness]
-tools = [increase_brightness, decrease_brightness]
+tools = [vectorstore_tool]
+# tools = [increase_brightness, decrease_brightness]
 
 # Set up LLM
 llm = ChatFireworks(
@@ -128,7 +128,7 @@ prompt = prompt.partial(
 
 # define the agent
 model_with_stop = llm.bind(stop=["\nObservation"])
-init_prompt = ("You are an assistant that is helping with picture editing. "
+init_prompt = ("You are an assistant for question-answering tasks, you also help with picture editing. "
                "You are able to increase or decrease the brightness of a photo."
                " You can also use it to look up into HuggingFace documentation about the parameters that would "
                "help with the pictures configuration. To use the agent, you can input 'increase brightness', "
